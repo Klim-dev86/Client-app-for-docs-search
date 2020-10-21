@@ -10,6 +10,7 @@ import json
 import zipfile
 import re
 from threading import Thread
+from db_module import update_db, find_name_in_db, find_path_in_db
 
 import config
 
@@ -20,6 +21,8 @@ server_address = config.server_address
 
 web_connection_flag = True
 server_connection_flag = True
+
+local_db_search = True
 
 
 class ScrollableFrame(Frame):
@@ -94,6 +97,9 @@ def represent_results(event=None):
         Thread(target=represent_results_web_search, args=[], daemon=True).start()
         # represent_results_web_search()
     if server_connection_flag:
+        # if local_db_search:
+        #     pass
+        # else:
         show_message('Поиск ... ', frame_local_server)
         Thread(target=represent_results_local_server, args=[], daemon=True).start()
 
@@ -201,17 +207,26 @@ def represent_results_local_server(event=None):
     paths = []
     table = []
 
-    for roots, dirs, files in os.walk(f"{server_address}"):
-        for file in files:
+    if local_db_search:
+        paths = find_path_in_db(message_string)
+        table = find_name_in_db(message_string)
+    else:
 
-            if re.search(message_string, file.lower()):
-                table.append(file)
-                print(os.path.join(roots, file))
-                paths.append(os.path.join(roots, file))
+        for roots, dirs, files in os.walk(f"{server_address}"):
+            for file in files:
+
+                if re.search(message_string, file.lower()):
+                    table.append(file)
+                    print(os.path.join(roots, file))
+                    paths.append(os.path.join(roots, file))
+
+    max_table_length = 500
+    if len(table) > max_table_length:
+        table = table[:max_table_length:]
 
     if table:
         for i in range(len(table)):
-            label1 = Label(frame_local_server.scrollable_frame, text=table[i].strip()[:50:],
+            label1 = Label(frame_local_server.scrollable_frame, text=table[i].strip()[:70:],
                            fg="black",
                            bg="#eee",
                            font="Helvetica 14 bold",
@@ -258,6 +273,17 @@ def show_message(message_text, current_frame):
     label_err_info.grid(row=0, column=0, padx=20, pady=10)
 
 
+def server_db_or_folder_search():
+    global local_db_search
+    if local_db_search:
+        local_db_search = False
+        toggle_btn['text'] = "Включен поиск в папке сервера"
+    else:
+        local_db_search = True
+        toggle_btn['text'] = "Включен поиск в локальной базе сервера"
+
+
+
 #######
 
 root = Tk()
@@ -280,9 +306,30 @@ root.columnconfigure(2, weight=1)
 
 # Place company label
 img = ImageTk.PhotoImage(Image.open("./img/title_img.png"))
-panel = Label(root, image=img)
-panel.grid(row=0, column=0, columnspan=3, ipadx=0.5)
-panel.configure(background='black')
+logo = Label(root, image=img)
+logo.grid(row=0, column=2)
+logo.configure(background='black')
+
+
+updt_btn = Button(text="Обновить локальную базу данных сервера",  # текст кнопки
+                  background="black",  # фоновый цвет кнопки
+                  foreground="grey",  # цвет текста
+                  padx="25",  # отступ от границ до содержимого по горизонтали
+                  pady="5",  # отступ от границ до содержимого по вертикали
+                  font="Helvetica 12 bold",  # высота шрифта
+                  command=update_db)
+updt_btn.grid(row=0, column=0, padx=19, pady=5, sticky=W + N)
+
+
+toggle_btn = Button(text="Включен поиск в локальной базе сервера",  # текст кнопки
+             background="black",  # фоновый цвет кнопки
+             foreground="grey",  # цвет текста
+             padx="25",  # отступ от границ до содержимого по горизонтали
+             pady="5",  # отступ от границ до содержимого по вертикали
+             font="Helvetica 12 bold",  # высота шрифта
+             command=server_db_or_folder_search)
+toggle_btn.grid(row=0, column=1, padx=5, pady=5, sticky=W+N)
+
 
 message = StringVar()
 
@@ -297,14 +344,14 @@ message_entry.focus_set()
 message_entry.grid(row=1, column=0, columnspan=2, padx=20, pady=20)
 
 # Button 'Search'
-btn = Button(text="Искать",  # текст кнопки
-             background="black",  # фоновый цвет кнопки
-             foreground="white",  # цвет текста
-             padx="25",  # отступ от границ до содержимого по горизонтали
-             pady="5",  # отступ от границ до содержимого по вертикали
-             font="Helvetica 16 bold",  # высота шрифта
-             command=represent_results)
-btn.grid(row=1, column=2, padx=20)
+updt_btn = Button(text="Искать",  # текст кнопки
+                  background="black",  # фоновый цвет кнопки
+                  foreground="white",  # цвет текста
+                  padx="25",  # отступ от границ до содержимого по горизонтали
+                  pady="5",  # отступ от границ до содержимого по вертикали
+                  font="Helvetica 16 bold",  # высота шрифта
+                  command=represent_results)
+updt_btn.grid(row=1, column=2, padx=20)
 
 # Create custom style
 style = ttk.Style()
